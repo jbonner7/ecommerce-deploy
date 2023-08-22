@@ -1,0 +1,251 @@
+# frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-website
+  labels:
+    apps: ecommerce-website
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: '*'
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: 'tcp'
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ports:
+    - name: ecommerce-website
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: ecommerce-website
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-website
+  labels:
+    app: ecommerce-website
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ecommerce-website
+  template:
+    metadata:
+      labels:
+        app: ecommerce-website
+    spec:
+      containers:
+      - name: ecommerce-website
+        image: detcaccounts/ecommerce-website
+        securityContext:
+          privileged: true
+        env:
+        - name: LOGIN_SERVICE_URL
+          value: "http://ecommerce-login:9001/login"
+        - name: INVENTORY_SERVICE_URL
+          value: "http://ecommerce-inventory:9001/inventory"
+        - name: ORDER_SERVICE_URL
+          value: "http://ecommerce-order:9001/order"
+        ports:
+        - containerPort: 4567
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-login
+  labels:
+    app: ecommerce-login
+spec:
+  clusterIP: None
+  ports:
+  - name: ecommerce-login
+    port: 9001
+    protocol: TCP
+    targetPort: 9001
+  selector:
+    app: ecommerce-login
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-login
+  labels:
+    app: ecommerce-login
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-login
+  template:
+    metadata:
+      labels:
+        app: ecommerce-login
+    spec:
+      containers:
+      - name: ecommerce-login
+        image: detcaccounts/ecommerce-login
+        env:
+        - name: NODB
+          value: "true"
+        ports:
+        - containerPort: 9001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-inventory
+  labels:
+    app: ecommerce-inventory
+spec:
+  clusterIP: None
+  ports:
+  - name: ecommerce-inventory
+    port: 9001
+    protocol: TCP
+    targetPort: 9001
+  selector:
+    app: ecommerce-inventory
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-inventory
+  labels:
+    app: ecommerce-inventory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-inventory
+  template:
+    metadata:
+      labels:
+        app: ecommerce-inventory
+    spec:
+      containers:
+      - name: ecommerce-inventory
+        image: detcaccounts/ecommerce-inventory
+        env:
+        - name: DATABASE_TYPE
+          value: "postgres"
+        - name: DATABASE_USER
+          value: "postgres"
+        - name: DATABASE_HOST
+          value: "ecommerce-inventory-db"
+        - name: DATABASE_PASSWORD
+          value: "postgres"
+        - name: DATABASE_DATABASE
+          value: "inventory"
+        - name: DATABASE_PORT
+          value: "5432"
+        ports:
+        - containerPort: 9001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-inventory-db
+  labels:
+    app: ecommerce-inventory-db
+spec:
+  clusterIP: None
+  ports:
+  - name: ecommerce-inventory-db
+    port: 5432
+    protocol: TCP
+    targetPort: 5432
+  selector:
+    app: ecommerce-inventory-db
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-inventory-db
+  labels:
+    app: ecommerce-inventory-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-inventory-db
+  template:
+    metadata:
+      labels:
+        app: ecommerce-inventory-db
+    spec:
+      containers:
+      - name: ecommerce-inventory-db
+        image: postgres
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "inventory"
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-order
+  labels:
+    app: ecommerce-order
+spec:
+  clusterIP: None
+  ports:
+  - name: ecommerce-order
+    port: 9001
+    protocol: TCP
+    targetPort: 9001
+  selector:
+    app: ecommerce-order
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-order
+  labels:
+    app: ecommerce-order
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-order
+  template:
+    metadata:
+      labels:
+        app: ecommerce-order
+    spec:
+      containers:
+      - name: ecommerce-order
+        image: detcaccounts/ecommerce-order
+        env:
+        - name: DATABASE_TYPE
+          value: "mysql"
+        - name: DATABASE_USER
+          value: "{{ .database_username }}"
+        - name: DATABASE_PASSWORD
+          value: "{{ .database_password }}"
+        - name: DATABASE_HOST
+          value: "{{ .database_host }}"
+        - name: DATABASE_DATABASE
+          value: "{{ .database_name }}"
+        - name: DATABASE_PORT
+          value: "{{ .database_port }}"
+        - name: INVENTORY_SERVICE_URL
+          value: "http://ecommerce-inventory:9001/inventory"
+        - name: TRACK_ORDER_URL
+          value: "{{ index .  track_order_url }}"
+        ports:
+        - containerPort: 9001
+          name: ecommerce-order
+      initContainers:
+      - name: init-dump-createdb
+        image: imega/mysql-client
+        command: 
+        - sh
+        - -xc
+        - 'mysqladmin --host={{ .database_host }} --user={{ .database_username }} --password={{ .database_password }} --port={{ .database_port }}  create {{.database_name}} || exit 0'

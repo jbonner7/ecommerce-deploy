@@ -71,7 +71,8 @@ module "eks" {
       desired_size           = 2
       max_size               = 10
       iam_role_additional_policies = concat([
-        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+        "arn:aws:iam::aws:policy/AdministratorAccess",
       ], local.extra_iam_policies)
     }
   }
