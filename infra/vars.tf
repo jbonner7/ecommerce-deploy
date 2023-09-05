@@ -24,8 +24,3 @@ variable "ami_type" {
 variable "cluster_name" {
   description = "Name of the EKS cluster.  Example: rotate"
 }
-
-variable "iam_role_additional_policies" {
-  description = "additional iam policies to attach to the worker nodes, comma separated"
-  default     = ""
-}

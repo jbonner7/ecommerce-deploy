@@ -36,9 +36,8 @@ terraform {
 }
 
 locals {
-  cluster_name       = "eks-demo-${var.cluster_name}"
-  http_tokens        = "optional"
-  extra_iam_policies = split(",", var.iam_role_additional_policies)
+  cluster_name = "eks-demo-${var.cluster_name}"
+  http_tokens  = "optional"
 }
 
 module "eks" {
@@ -70,10 +69,8 @@ module "eks" {
       min_size               = 1
       desired_size           = 2
       max_size               = 10
-      iam_role_additional_policies = concat([
-        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
-        "arn:aws:iam::aws:policy/AdministratorAccess",
-      ], local.extra_iam_policies)
+      create_iam_role        = false
+      iam_role_arn           = aws_iam_role.eks-node-group.arn
     }
   }
 }
